@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.*;
-import javax.swing.border.LineBorder;
+import javax.swing.border.EmptyBorder;
 
 
 public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionListener{
@@ -36,7 +36,8 @@ public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionL
     
      JPanel panelcam = new JPanel();
      JLabel resultlabel = new JLabel("STUDENT QR ");
-     JButton savebtn = new JButton("Save Student");
+     JButton savebtn = new JButton("Save");
+     JButton cancelbtn = new JButton("Cancel");
      public JTextArea resultField = new JTextArea();
     
     public QRScanner(Dashboard_Inventory dashboard){
@@ -48,10 +49,10 @@ public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionL
         this.setSize(600, 600);
         this.setLocationRelativeTo(null);
         this.setResizable(false);
-        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        this.setUndecorated(true);
         
         panelcam.setBounds(50, 50, 500,300);
-        panelcam.setBorder(new LineBorder(Color.BLACK,1));
+        panelcam.setBorder(new EmptyBorder(10, 10, 10, 10));
         add(panelcam);
         
         resultlabel.setBounds(50, 380, 100, 25);
@@ -60,9 +61,13 @@ public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionL
         resultField.setBounds(50, 420, 500, 50);
         add(resultField);
         
-        savebtn.setBounds(50, 480, 150, 30);
+        savebtn.setBounds(340, 500, 100, 30);
         add(savebtn);
         savebtn.addActionListener(this);
+        
+        cancelbtn.setBounds(450, 500, 100, 30);
+        add(cancelbtn);
+        cancelbtn.addActionListener(this);
         
     }
     
@@ -82,38 +87,42 @@ public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionL
 
     @Override
     public void run() {
-        
-        do{
+        do {
             try {
-                Thread.sleep(100);
+                Thread.sleep(100); // Add a small delay
             } catch (InterruptedException ex) {
-                Logger.getLogger(QRScanner.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(QRScanner.class.getName()).log(Level.WARNING, "Thread interrupted", ex);
             }
-            
-            Result result = null;
+
             BufferedImage image = null;
-            
-            if(webcam.isOpen()){
-                if((image = webcam.getImage()) == null){
-                    continue;
+
+            // Check if the webcam is open and active
+            if (webcam != null && webcam.isOpen()) {
+                image = webcam.getImage();
+                if (image == null) {
+                    Logger.getLogger(QRScanner.class.getName()).log(Level.WARNING, "Webcam returned null image");
+                    continue; // Skip processing if no image is captured
                 }
+            } else {
+                Logger.getLogger(QRScanner.class.getName()).log(Level.SEVERE, "Webcam is not open or available");
+                break; // Exit the loop if the webcam is not open
             }
-            
+
+            // Process the image for QR code
             LuminanceSource source = new BufferedImageLuminanceSource(image);
             BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
-            
+
             try {
-                result = new MultiFormatReader().decode(bitmap);
+                Result result = new MultiFormatReader().decode(bitmap);
+                if (result != null) {
+                    resultField.setText(result.getText());
+                }
             } catch (NotFoundException ex) {
-                Logger.getLogger(QRScanner.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(QRScanner.class.getName()).log(Level.FINE, "No QR code found in the current frame");
             }
-            
-            if(result !=null){
-                resultField.setText(result.getText());
-            }
-            
-        }while(true);
+        } while (true);
     }
+
 
     @Override
     public Thread newThread(Runnable r) {
@@ -128,18 +137,37 @@ public class QRScanner extends JFrame implements Runnable,ThreadFactory, ActionL
         if(e.getSource().equals(savebtn)){
             String QRValue = resultField.getText();
             
-            if (!QRValue.isEmpty()) {
-                 dashboard.scannedValue.setText(QRValue);
-                 formattedText = QRValue.replace("Student No.:", "Student No.:\n")
-                        .replace("Full Name:", "\nFull Name:\n")
-                        .replace("Program:", "\nProgram:\n");
-                JOptionPane.showMessageDialog(this, "Value sent to Student Details Form!", "Info", JOptionPane.INFORMATION_MESSAGE);
-                dispose();
-            } else {
-                JOptionPane.showMessageDialog(this, "No QR code scanned!", "Error", JOptionPane.ERROR_MESSAGE);
+            if(isValidQRValue(QRValue)){
+                if (!QRValue.isEmpty()) {
+                    dashboard.scannedValue.setText(QRValue);
+                    formattedText = QRValue.replace("Student No.:", "Student No.:\n")
+                            .replace("Full Name:", "\nFull Name:\n")
+                            .replace("Program:", "\nProgram:\n");
+                    JOptionPane.showMessageDialog(this, "Value sent to Student Details Form!", "Info", JOptionPane.INFORMATION_MESSAGE);
+                    webcam.close();
+                    dispose();
+                } else {
+                    JOptionPane.showMessageDialog(this, "No QR code scanned!", "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            } else{
+                JOptionPane.showMessageDialog(this, "Invalid QR code scanned!", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
+        
+        if(e.getSource().equals(cancelbtn)){
+            webcam.close();
+            dispose();
+        }
     }
-
+    
+    private boolean isValidQRValue(String qrValue){
+        if(qrValue == null || qrValue.isEmpty()){
+            return false;
+        }
+        
+        return qrValue.contains("Student No.:")
+                && qrValue.contains("Full Name:")
+                && qrValue.contains("Program:");
+    }
   }
 

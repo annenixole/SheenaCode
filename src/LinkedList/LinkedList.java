@@ -8,7 +8,7 @@ public class LinkedList {
         head = null;
      }
      
-     public void addItem(String image,int isbn,String booktype,String categ, String title, String author,int quantity,int borrowedquantity, double price){
+     public void addItem(String image,long isbn,String booktype,String categ, String title, String author,int quantity,int borrowedquantity, double price){
         BookInventory newItem = new BookInventory(image,isbn,booktype,categ,title,author,quantity,borrowedquantity,price);
         
             newItem.next = head; //the new Item will be addded on top
@@ -41,7 +41,7 @@ public class LinkedList {
          current.next = current.next.next; //remove the node
      }
      
-     public void updateItem(int index,String newImage,int newisbn,String newBooktype,String newCateg, String newTitle, String newAuthor,int newquantity,int newborrowedquantity,double newPrice) {
+     public void updateItem(int index,String newImage,long newisbn,String newBooktype,String newCateg, String newTitle, String newAuthor,int newquantity,int newborrowedquantity,double newPrice) {
         BookInventory current = head;
         int search = 0;
         

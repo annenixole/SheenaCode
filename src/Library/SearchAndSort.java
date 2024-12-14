@@ -4,17 +4,26 @@ import java.util.ArrayList;
 import javax.swing.table.DefaultTableModel;
 
 public class SearchAndSort {
-    
-    public void sortByTitle(DefaultTableModel tableModel) {
-        quickSort(tableModel, 4); 
+ 
+    public void sortByTitle(DefaultTableModel tableModel, boolean ascending) {
+        quickSort(tableModel, 4,ascending); 
     }
 
-    public void sortByAuthor(DefaultTableModel tableModel) {
-        quickSort(tableModel, 5); 
+    public void sortByAuthor(DefaultTableModel tableModel, boolean ascending) {
+        quickSort(tableModel, 5,ascending); 
     }
     
-    //method overloading
-    private void quickSort(DefaultTableModel tableModel, int columnIndex) {
+    public void sortByBorrowerNo(DefaultTableModel tableModel, boolean ascending) {
+        quickSort(tableModel, 0,ascending); // 0 is the index for "Borrower No"
+    }
+
+    // Sort by Date (assuming it's in column 2 for Borrowed Date or 3 for Expected Return Date)
+    public void sortByDate(DefaultTableModel tableModel, int dateColumnIndex,boolean ascending) {
+        quickSort(tableModel, dateColumnIndex, ascending); // Pass the date column index (2 or 3)
+    }
+    
+// Sorting function for column index and order
+    private void quickSort(DefaultTableModel tableModel, int columnIndex, boolean ascending) {
         int rowCount = tableModel.getRowCount();
         if (rowCount < 2) {
             return; // No need to sort if there's 0 or 1 row
@@ -28,7 +37,7 @@ public class SearchAndSort {
             }
         }
 
-        quickSort(tableData, 0, rowCount - 1, columnIndex);
+        quickSort(tableData, 0, rowCount - 1, columnIndex, ascending);
 
         // Update the table with sorted data
         for (int i = 0; i < rowCount; i++) {
@@ -38,21 +47,23 @@ public class SearchAndSort {
         }
     }
 
-    private void quickSort(Object[][] data, int low, int high, int columnIndex) {
+    private void quickSort(Object[][] data, int low, int high, int columnIndex, boolean ascending) {
         if (low < high) {
-            int pivotIndex = partition(data, low, high, columnIndex);
-            quickSort(data, low, pivotIndex - 1, columnIndex);
-            quickSort(data, pivotIndex + 1, high, columnIndex);
+            int pivotIndex = partition(data, low, high, columnIndex, ascending);
+            quickSort(data, low, pivotIndex - 1, columnIndex, ascending);
+            quickSort(data, pivotIndex + 1, high, columnIndex, ascending);
         }
     }
 
-    private int partition(Object[][] data, int low, int high, int columnIndex) {
+    private int partition(Object[][] data, int low, int high, int columnIndex, boolean ascending) {
         String pivot = (String) data[high][columnIndex]; // Use the last element as pivot
         int i = low - 1;
 
         for (int j = low; j < high; j++) {
             String currentValue = (String) data[j][columnIndex];
-            if (currentValue.compareToIgnoreCase(pivot) <= 0) {
+            // Modify comparison for ascending/descending order
+            if ((ascending && currentValue.compareToIgnoreCase(pivot) <= 0)
+                    || (!ascending && currentValue.compareToIgnoreCase(pivot) > 0)) {
                 i++;
                 // Swap data[i] and data[j]
                 Object[] temp = data[i];
@@ -114,8 +125,7 @@ public class SearchAndSort {
                 resultRows.add(row);
             }
         }
-
         // Update the table with only the matching rows
-        updateTableModel(tableModel, resultRows); // to call 
+        updateTableModel(tableModel, resultRows);  
     }
 }

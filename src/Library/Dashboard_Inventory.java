@@ -1,12 +1,13 @@
 
 package Library;
+import Interface.LibraryInterface;
 import LinkedList.LinkedList;
 import LinkedList.BookInventory;
 import LinkedList.BorrowedLinkedList;
-import LinkedList.BorrowedBookNode;
 import StudentIDScanner.QRScanner;
 
 import static Library.Dashboard_Inventory.getCurrentDate;
+import LinkedList.BorrowedBookNode;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
@@ -14,22 +15,25 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
-import java.util.Arrays;
 import javax.swing.*;
 import static javax.swing.JOptionPane.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 
-public class Dashboard_Inventory extends JFrame implements ActionListener, ItemListener {
+public class Dashboard_Inventory extends JFrame implements ActionListener, ItemListener, LibraryInterface{
     private TrackBooks trackBooks;
-    
+    private LibrarianReport librarianReport;
+    private EditProfile editProfile;
+    ReturnBooks returnBooks = new ReturnBooks(trackBooks,this);
+    SearchAndSort s = new SearchAndSort();
+            
     LinkedList List = new LinkedList();
     BorrowedLinkedList BorrowedList = new BorrowedLinkedList();
+    //for adding the book into borrowedlist
+    ArrayList<Object[]> borrowedBooksList = new ArrayList<>();
     
     int bookborrownum;
     int borrowerCount = 1;
-    
-    SearchAndSort s = new SearchAndSort();
 
     String imgpath;
     private static final int borrowbooklimit = 2;
@@ -75,9 +79,6 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     JTextField isbnField = new JTextField();
     JTextField priceField = new JTextField();
     JButton addButton = new JButton("Done");
-    
-    // EXAMPLE LANG
-    private String currentPassword = "123456";
 
     JFileChooser file = new JFileChooser();
     
@@ -86,12 +87,11 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     JTable booktable;
     int row;
     
-    //for adding the book into borrowedlist
-    ArrayList<Object[]> borrowedBooksList = new ArrayList<>();
     String[] headertable = new String[]{"Book Image", "ISBN", "Book", "Category", "Title", "Author","Quantity","Borrowed Quantity","Price"};
     //book variables
     String imagebook, titlebook, bookauthor, bookType, categType, borrowerDetails;
-    int isbnbook,quantitybook;
+    int quantitybook;
+    long isbnbook;
     double pricebook;
     int borrowedquantity;
     
@@ -102,33 +102,53 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     int totalBooks;
     int totalBorrowedBooks;
     int CurrentNumBooks;
+    int currentBorrowed;
+    int borrowednum;
+    int bookquantity;
+    int currentQuantity;
     
     String callNumber;
     String borrowerNum;
     int quantity;
     String borrowedDate;
     String Borrower;
-    String returnDate;  
-    
-    ArrayList<Object[]> borrowedBooksRecords = new ArrayList<>();
-    
-    
-   
+    String returnDate;
 
     public Dashboard_Inventory() {
         
-        TrackBooks trackBooks = new TrackBooks(); 
-        contentPanel.add(trackBooks, "TrackBooks"); 
+        contentPanel.setLayout(new CardLayout()); // for switching contentpanels
+        
+        trackBooks = new TrackBooks();
+        contentPanel.add(trackBooks, "TrackBooks");
+        
+        returnBooks = new ReturnBooks(trackBooks,this);
+        contentPanel.add(returnBooks.returnbooksP,"ReturnBooks");
+        
+        editProfile = new EditProfile();
+        contentPanel.add(editProfile,"EditProfile");
+        
+        librarianReport = new LibrarianReport();
+        contentPanel.add(librarianReport,"LibrarianReport");
+        
+        // 4TH PANEL      
+        JPanel bgpanel4 = new JPanel();
+        bgpanel4.setBounds(20, 20, 750, 580);
+        bgpanel4.setBackground(new Color(230, 230, 220));
+        bgpanel4.setLayout(null);
+        inventoryP.add(bgpanel4);
         
         Inventorytable = new DefaultTableModel(headertable, 0);
         booktable = new JTable(Inventorytable);
         JScrollPane booktable_scroll = new JScrollPane(booktable);
+        bgpanel4.add(booktable_scroll);
+        booktable_scroll.setBounds(0, 120, 750, 460);
+        booktable.getColumnModel().removeColumn(booktable.getColumnModel().getColumn(0));
         
-        List.addItem("null", 20233, "Academic Books", "Cells and So", "Biology", "Mendeleev", 2,0, 200);
-        List.addItem("null", 20234, "Academic Books", "Anformation System", "Haha", "Reinius", 2,0, 100);
-        List.addItem("null", 20293, "Academic Books", "Znformation Technology", "Intro to Computing", "Aendeleev", 2,0, 200);
+        List.addItem("C:\\Users\\Annenixole\\Downloads\\Library System Images\\CLB_WorldofComputerScience.png", 9780787649609L, "Academic Books", "Computing Literature", "World of Computer Science", "Brigham Narins", 10,0, 200);
+        List.addItem("C:\\Users\\Annenixole\\Downloads\\Library System Images\\BMB_EssentialofEntrep.png", 9781788115896L, "Academic Books", "Business and Management", "Essentials of Entrepreneurship", "Robert A. Baron", 15,0, 100);
+        List.addItem("C:\\Users\\Annenixole\\Downloads\\Library System Images\\ELB_MathematicsinEngineering.png", 9781351266321L, "Academic Books", "Engineering Literature", "Mathematics in Engineering Sciences", "Mangey Ram", 8,0, 200);
         displayData();
-
+                //Displaying the book visual image
         booktable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -153,320 +173,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         this.setLocationRelativeTo(null);
         this.setResizable(false);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        
-        
 
-        // PROFILE INFO
-        JPanel editProfileP = new JPanel();
-        editProfileP.setLayout(null);
-        editProfileP.setBackground(new Color(245, 245, 245));
-        contentPanel.add(editProfileP, "EditProfile");
-
-        JPanel contentPanelP = new JPanel();
-        contentPanelP.setBounds(20, 20, 1040, 630); 
-        contentPanelP.setBackground(new Color(245, 250, 245)); // Light green tint
-        contentPanelP.setLayout(null);
-        contentPanelP.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
-        editProfileP.add(contentPanelP);
-
-        JLabel titleLabel = new JLabel("Profile");
-        titleLabel.setBounds(40, 15, 200, 40);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
-        contentPanelP.add(titleLabel);
-
-        JLabel imageBorder = new JLabel();
-        imageBorder.setBounds(200, 130, 180, 180);
-        imageBorder.setBorder(BorderFactory.createLineBorder(Color.GRAY, 2));
-        contentPanelP.add(imageBorder);
-        
-        Font labelFontP = new Font("Segoi UI", Font.BOLD, 16); 
-        Font valueFont = new Font("Segoi UI", Font.PLAIN, 15); 
-
-        JLabel nameLabel = new JLabel("Name:");
-        nameLabel.setBounds(450, 120, 100, 30);
-        nameLabel.setFont(labelFontP);
-        contentPanelP.add(nameLabel);
-
-        JLabel nameValue = new JLabel("Sheena S.P Ramos"); 
-        nameValue.setBounds(450, 150, 300, 30);
-        nameValue.setFont(valueFont);
-        contentPanelP.add(nameValue);
-
-        JLabel emailLabel = new JLabel("Email:");
-        emailLabel.setBounds(450, 180, 100, 30);
-        emailLabel.setFont(labelFontP);
-        contentPanelP.add(emailLabel);
-
-        JLabel emailValue = new JLabel("ramossheena028@gmail.com"); 
-        emailValue.setBounds(450, 210, 300, 30);
-        emailValue.setFont(valueFont);
-        contentPanelP.add(emailValue);
-
-        JLabel phoneLabel = new JLabel("Phone:");
-        phoneLabel.setBounds(450, 240, 100, 30);
-        phoneLabel.setFont(labelFontP);
-        contentPanelP.add(phoneLabel);
-
-        JLabel phoneValue = new JLabel("+63945408756"); 
-        phoneValue.setBounds(450, 270, 300, 30);
-        phoneValue.setFont(valueFont);
-        contentPanelP.add(phoneValue);
-
-        JLabel employeeIdLabel = new JLabel("Employee ID:");
-        employeeIdLabel.setBounds(450, 300, 120, 30);
-        employeeIdLabel.setFont(labelFontP);
-        contentPanelP.add(employeeIdLabel);
-
-        JLabel employeeIdValue = new JLabel("LIB123456"); 
-        employeeIdValue.setBounds(450, 330, 300, 30);
-        employeeIdValue.setFont(valueFont);
-        contentPanelP.add(employeeIdValue);
-        
-        JButton uploadImageBtn = new JButton("Upload Picture");
-        uploadImageBtn.setBounds(215, 325, 150, 35); 
-        uploadImageBtn.setFont(new Font("SansSerif", Font.BOLD, 14)); 
-        uploadImageBtn.setBackground(new Color(46, 125, 50));
-        uploadImageBtn.setForeground(Color.WHITE); 
-        uploadImageBtn.setBorderPainted(false); 
-        uploadImageBtn.setFocusPainted(false); 
-        uploadImageBtn.setOpaque(true); 
-        contentPanelP.add(uploadImageBtn);
-
-        JButton editProfileBtn = new JButton("Edit Profile");
-        editProfileBtn.setBounds(450, 380, 150, 40); 
-        editProfileBtn.setBackground(Color.WHITE); 
-        editProfileBtn.setFont(new Font("Segoi UI", Font.BOLD, 14)); 
-        editProfileBtn.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1)); 
-        editProfileBtn.setBorderPainted(true); 
-        editProfileBtn.setFocusPainted(false); 
-        editProfileBtn.setOpaque(true); 
-        contentPanelP.add(editProfileBtn); 
-        
-        
-        // EDIT PROFILE PANEL
-        JPanel editProfile2 = new JPanel();
-        editProfile2.setLayout(null);
-        editProfile2.setBackground(new Color(245, 245, 245));
-        contentPanel.add(editProfile2, "EditProfile2");
-
-        JPanel contentPanel2 = new JPanel();
-        contentPanel2.setBounds(20, 20, 1040, 630);
-        contentPanel2.setBackground(new Color(245, 250, 245)); // Light green tint
-        contentPanel2.setLayout(null);
-        contentPanel2.setBorder(BorderFactory.createLineBorder(new Color(230, 230, 230), 1));
-        editProfile2.add(contentPanel2);
-        
-        JLabel editTitle = new JLabel("Edit Profile");
-        editTitle.setBounds(30, 15, 300, 40);
-        editTitle.setFont(new Font("Segoe UI", Font.BOLD, 24));
-        contentPanel2.add(editTitle);
-
-        JLabel imgBorder = new JLabel();
-        imgBorder.setBounds(30, 80, 150, 150);
-        imgBorder.setBorder(BorderFactory.createLineBorder(Color.GRAY, 2)); 
-        contentPanel2.add(imgBorder);
-
-        JButton imgBtn = new JButton("Upload");
-        imgBtn.setBounds(30, 240, 150, 30);
-        imgBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        imgBtn.setBackground(new Color(46, 125, 50));
-        imgBtn.setForeground(Color.WHITE);
-        imgBtn.setBorderPainted(false);
-        imgBtn.setFocusPainted(false);
-        imgBtn.setOpaque(true);
-        contentPanel2.add(imgBtn);
-
-        JSeparator line = new JSeparator();
-        line.setBounds(30, 290, 960, 2);
-        line.setBackground(Color.BLACK);
-        contentPanel2.add(line);
-
-        Font lblFont = new Font("Segoe UI", Font.BOLD, 14);
-
-        JLabel nameLbl = new JLabel("Name:");
-        nameLbl.setBounds(220, 80, 100, 30);
-        nameLbl.setFont(lblFont);
-        contentPanel2.add(nameLbl);
-
-        JTextField nameField = new JTextField();
-        nameField.setBounds(320, 80, 250, 30);
-        contentPanel2.add(nameField);
-
-        JLabel emailLbl = new JLabel("Email:");
-        emailLbl.setBounds(220, 130, 100, 30);
-        emailLbl.setFont(lblFont);
-        contentPanel2.add(emailLbl);
-
-        JTextField emailField = new JTextField();
-        emailField.setBounds(320, 130, 250, 30);
-        contentPanel2.add(emailField);
-
-        JLabel phoneLbl = new JLabel("Phone:");
-        phoneLbl.setBounds(220, 180, 100, 30);
-        phoneLbl.setFont(lblFont);
-        contentPanel2.add(phoneLbl);
-
-        JTextField phoneField = new JTextField();
-        phoneField.setBounds(320, 180, 250, 30);
-        contentPanel2.add(phoneField);
-
-        JLabel empIdLbl = new JLabel("Employee ID:");
-        empIdLbl.setBounds(220, 230, 120, 30);
-        empIdLbl.setFont(lblFont);
-        contentPanel2.add(empIdLbl);
-
-        JTextField empIdField = new JTextField();
-        empIdField.setBounds(320, 230, 250, 30);
-        empIdField.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200), 1));
-        empIdField.setEditable(false); 
-        contentPanel2.add(empIdField);
-
-        JLabel acctTitle = new JLabel("Account Settings");
-        acctTitle.setBounds(30, 310, 200, 40);
-        acctTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
-        contentPanel2.add(acctTitle);
-
-        JLabel currPassLbl = new JLabel("Current Password:");
-        currPassLbl.setBounds(30, 370, 150, 30);
-        currPassLbl.setFont(lblFont);
-        contentPanel2.add(currPassLbl);
-
-        JPasswordField currPassField = new JPasswordField();
-        currPassField.setBounds(180, 370, 250, 30);
-        contentPanel2.add(currPassField);
-
-        JLabel newPassLbl = new JLabel("New Password:");
-        newPassLbl.setBounds(30, 420, 150, 30);
-        newPassLbl.setFont(lblFont);
-        contentPanel2.add(newPassLbl);
-
-        JPasswordField newPassField = new JPasswordField();
-        newPassField.setBounds(180, 420, 250, 30);
-        contentPanel2.add(newPassField);
-        
-        JButton save2 = new JButton("Save");
-        save2.setBounds(770, 30, 100, 30); 
-        save2.setFont(new Font("SansSerif", Font.BOLD, 12));
-        save2.setBackground(new Color(46, 125, 50)); 
-        save2.setForeground(Color.WHITE); 
-        save2.setBorderPainted(false);
-        save2.setFocusPainted(false);
-        save2.setOpaque(true);
-        contentPanel2.add(save2);
-
-        JButton cancelBtn = new JButton("Cancel");
-        cancelBtn.setBounds(880, 30, 100, 30); 
-        cancelBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        cancelBtn.setBackground(new Color(169, 169, 169)); 
-        cancelBtn.setForeground(Color.WHITE);  
-        cancelBtn.setBorderPainted(false);
-        cancelBtn.setFocusPainted(false);
-        cancelBtn.setOpaque(true);
-        contentPanel2.add(cancelBtn);
-        
-        JButton save = new JButton("Save Changes");
-        save.setBounds(450, 520, 140, 35); 
-        save.setFont(new Font("Segoi UI", Font.BOLD, 14)); 
-        save.setBackground(Color.WHITE); 
-        save.setForeground(new Color(76, 175, 80)); 
-        save.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1)); 
-        save.setBorderPainted(true); 
-        save.setFocusPainted(false); 
-        save.setOpaque(true); 
-        contentPanel2.add(save);
-      
-
-        editProfileBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                nameField.setText(nameValue.getText());
-                emailField.setText(emailValue.getText());
-                phoneField.setText(phoneValue.getText());
-                empIdField.setText(employeeIdValue.getText());
-
-                CardLayout cardLayout = (CardLayout) contentPanel.getLayout();
-                cardLayout.show(contentPanel, "EditProfile2");
-            }
-        });
-
-        
-        cancelBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                CardLayout cardLayout = (CardLayout) contentPanel.getLayout();
-                cardLayout.show(contentPanel, "EditProfile");
-            }
-        });
-
-        save2.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                nameValue.setText(nameField.getText());
-                emailValue.setText(emailField.getText());
-                phoneValue.setText(phoneField.getText());
-                JOptionPane.showMessageDialog(null, "Profile Updated Successfully!");
-                CardLayout cardLayout = (CardLayout) contentPanel.getLayout();
-                cardLayout.show(contentPanel, "EditProfile");
-            }
-        });
-        
-        uploadImageBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-                int result = fileChooser.showOpenDialog(null);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    ImageIcon imageIcon = new ImageIcon(new ImageIcon(selectedFile.getAbsolutePath())
-                            .getImage().getScaledInstance(imageBorder.getWidth(), imageBorder.getHeight(), Image.SCALE_SMOOTH));
-                    imageBorder.setIcon(imageIcon);
-                }
-            }
-        });
-
-        imgBtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-                int result = fileChooser.showOpenDialog(null);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    ImageIcon imageIcon = new ImageIcon(new ImageIcon(selectedFile.getAbsolutePath())
-                            .getImage().getScaledInstance(imgBorder.getWidth(), imgBorder.getHeight(), Image.SCALE_SMOOTH));
-                    imgBorder.setIcon(imageIcon);
-                }
-            }
-        });
-        
-        save.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String enteredCurrentPassword = new String(currPassField.getPassword());
-                String newPassword = new String(newPassField.getPassword());
-
-                if (!enteredCurrentPassword.equals(currentPassword)) {
-                    JOptionPane.showMessageDialog(contentPanel2,
-                            "The current password you entered is incorrect.",
-                            "Invalid Password",
-                            JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
-
-                if (newPassword.isEmpty() || newPassword.length() < 6) {
-                    JOptionPane.showMessageDialog(contentPanel2, "The new password must be at least 6 characters long.", "Invalid Password",
-                    JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
-                
-                JOptionPane.showMessageDialog(contentPanel2, "Your password change request has been submitted. It requires admin approval.","Admin Approval Needed",
-                JOptionPane.INFORMATION_MESSAGE);
-
-                currPassField.setText("");
-                newPassField.setText("");
-            }
-        });
 
         //PARA SA PAGBUKAS IDK
         JPanel welcomePanel = new JPanel();
@@ -488,15 +195,6 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         contentPanel.add(welcomePanel, "Welcome");
         CardLayout cardLayout = (CardLayout) contentPanel.getLayout();
         cardLayout.show(contentPanel, "Welcome");
-
-        // 4TH PANEL      
-        JPanel bgpanel4 = new JPanel();
-        bgpanel4.setBounds(20, 20, 750, 580);
-        bgpanel4.setBackground(new Color(230, 230, 220));
-        bgpanel4.setLayout(null);
-        inventoryP.add(bgpanel4);
-        bgpanel4.add(booktable_scroll);
-        booktable_scroll.setBounds(0, 120, 750, 460);
         
         setButton(inventorybtn, 300);
         setButton(returnbookbtn, 340);
@@ -630,7 +328,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             }
 
         });
-
+        //to quickly search by pressing the enter button
         searchField.addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
@@ -657,44 +355,14 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             public void actionPerformed(ActionEvent e) {
                 String selectedOption = (String) sortComboBox.getSelectedItem();
                 if ("Sort by Title".equals(selectedOption)) {
-                    s.sortByTitle(Inventorytable); // Sort by Title
+                    boolean ascending = true; 
+                    s.sortByTitle(Inventorytable,ascending); // Sort by Title
                 } else if ("Sort by Author".equals(selectedOption)) {
-                    s.sortByAuthor(Inventorytable); // Sort by Author
+                    boolean ascending = true; 
+                    s.sortByAuthor(Inventorytable,ascending); // Sort by Author
                 }
             }
         });
-        
-        imageholder.setBounds(70, 100, 130, 130);
-        imageholder.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
-        
-        this.add(imageholder);
-        
-        imageholder.setIcon(new ImageIcon("C:\\Users\\Sheena Ramos\\OneDrive\\Desktop\\Profile.jpeg")); 
-
-        JLabel editProfileLabel = new JLabel("Edit Profile");
-        editProfileLabel.setBounds(95, 160, 130, 20);
-        editProfileLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        editProfileLabel.setForeground(Color.WHITE);
-        editProfileLabel.setVisible(false); // Hide the label initially
-        this.add(editProfileLabel);
-
-        imageholder.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                editProfileLabel.setVisible(true); // Show the label when hovered
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                editProfileLabel.setVisible(false); // Hide the label when not hovered
-            }
-        });
-
-
-        username.setBounds(60, 250, 200, 25);
-        username.setFont(new Font("Arial", Font.BOLD, 17));
-        username.setForeground(Color.WHITE);
-        this.add(username);
 
         header.setBackground(new Color(46, 125, 50));
         header.setBounds(0, 0, 1366, 50);
@@ -717,11 +385,11 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         inventoryP.setLayout(null);
 
         bgPanel2.setLayout(null);
-        bgPanel2.setBounds(790, 20, 250, 220);
+        bgPanel2.setBounds(790, 20, 250, 260);
         bgPanel2.setBackground(new Color(245, 245, 245));
         bgPanel2.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY, 1));
         bgPanel2.add(bookimageholder);
-        bookimageholder.setBounds(5, 5, 240, 210);
+        bookimageholder.setBounds(5, 5, 240, 250);
         bookimageholder.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 1));
         inventoryP.add(bgPanel2);
 
@@ -729,168 +397,8 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         bgPanel3.setBackground(new Color(245, 245, 245));
         bgPanel3.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY, 1));
         Font labelFont = new Font("Segoe Ui", Font.BOLD, 14);
-
-        // RETURN BOOKS NA MENU
-        JPanel returnBooksPnl = new JPanel();
-        returnBooksPnl.setLayout(null);
-        returnBooksPnl.setBackground(new Color(250, 250, 240));
-        contentPanel.add(returnBooksPnl, "ReturnBooks");
-
-        JPanel returnPanel1 = new JPanel();
-        returnPanel1.setBounds(20, 20, 750, 660);
-        returnPanel1.setBackground(new Color(230, 230, 220));
-        returnPanel1.setLayout(null);
-        returnBooksPnl.add(returnPanel1);
-
-        JPanel returnPanel2 = new JPanel();
-        returnPanel2.setLayout(null);
-        returnPanel2.setBounds(790, 20, 250, 230);
-        returnPanel2.setBackground(new Color(230, 230, 230));
-        returnBooksPnl.add(returnPanel2);
-
-        JPanel returnPanel3 = new JPanel();
-        returnPanel3.setLayout(null);
-        returnPanel3.setBounds(790, 280, 250, 240);
-        returnPanel3.setBackground(new Color(230, 230, 230));
-        returnBooksPnl.add(returnPanel3);
-
-        JButton code = new JButton("Code");
-        code.setBounds(50, 30, 180, 30);
-        code.setBackground(Color.WHITE);
-        code.setForeground(new Color(76, 175, 80));
-        code.setFont(new Font("Segoi UI", Font.BOLD, 14));
-        code.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1));
-        code.setBorderPainted(true);
-        code.setFocusPainted(false);
-        code.setOpaque(true);
-        returnPanel1.add(code);
-
-        JButton enter = new JButton("Enter");
-        enter.setBounds(250, 30, 120, 30);
-        enter.setBackground(Color.WHITE);
-        enter.setForeground(new Color(76, 175, 80));
-        enter.setFont(new Font("Segoi UI", Font.BOLD, 14));
-        enter.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1));
-        enter.setBorderPainted(true);
-        enter.setFocusPainted(false);
-        enter.setOpaque(true);
-        returnPanel1.add(enter);
-
-        JPanel returnPanel4 = new JPanel();
-        returnPanel4.setLayout(null);
-        returnPanel4.setBounds(50, 70, 650, 555);
-        returnPanel4.setBackground(new Color(250, 250, 240));
-        returnPanel1.add(returnPanel4);
-
-        JLabel date = new JLabel("Date Returned:");
-        date.setBounds(70, 22, 120, 20);
-        date.setFont(new Font("Sans Serif", Font.PLAIN, 16));
-        date.setForeground(new Color(54, 69, 79));
-        returnPanel4.add(date);
-
-        JTextField dateField = new JTextField();
-        dateField.setBounds(200, 20, 170, 25);
-        dateField.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        dateField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        returnPanel4.add(dateField);
-
-        // DAMAGES NA CHECKBOX 
-        JPanel damagesPnl = new JPanel();
-        damagesPnl.setBounds(70, 70, 505, 310);
-        damagesPnl.setBackground(new Color(250, 250, 240));
-        damagesPnl.setLayout(null);
-        damagesPnl.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
-
-        JLabel damagelbl = new JLabel(" Damages:");
-        damagelbl.setBounds(10, 10, 150, 22);
-        damagelbl.setFont(new Font("Sans Serif", Font.PLAIN, 16));
-        damagelbl.setForeground(new Color(54, 69, 79));
-        damagesPnl.add(damagelbl);
-
-        JCheckBox tornPages = new JCheckBox("Torn Pages");
-        tornPages.setBounds(10, 40, 200, 25);
-        tornPages.setBackground(new Color(250, 250, 240));
-        tornPages.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(tornPages);
-
-        JCheckBox waterDamage = new JCheckBox("Water Damage");
-        waterDamage.setBounds(10, 70, 200, 25);
-        waterDamage.setBackground(new Color(250, 250, 240));
-        waterDamage.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(waterDamage);
-
-        JCheckBox missingyou = new JCheckBox("Missing Pages");
-        missingyou.setBounds(10, 100, 200, 25);
-        missingyou.setBackground(new Color(250, 250, 240));
-        missingyou.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(missingyou);
-
-        JCheckBox writing = new JCheckBox("Writing or Markings on Pages");
-        writing.setBounds(10, 130, 250, 25);
-        writing.setBackground(new Color(250, 250, 240));
-        writing.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(writing);
-
-        JCheckBox binding = new JCheckBox("Loose Binding");
-        binding.setBounds(10, 160, 200, 25);
-        binding.setBackground(new Color(250, 250, 240));
-        binding.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(binding);
-
-        JCheckBox cover = new JCheckBox("Missing Cover");
-        cover.setBounds(10, 190, 200, 25);
-        cover.setBackground(new Color(250, 250, 240));
-        cover.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(cover);
-
-        JCheckBox foodStains = new JCheckBox("Food or Drink Stains");
-        foodStains.setBounds(10, 220, 200, 25);
-        foodStains.setBackground(new Color(250, 250, 240));
-        foodStains.setFont(new Font("Sans Serif", Font.PLAIN, 14));
-        damagesPnl.add(foodStains);
-
-        JLabel explainmo = new JLabel("Explain Further (if any):");
-        explainmo.setBounds(15, 255, 200, 20);
-        explainmo.setFont(new Font("Sans Serif", Font.PLAIN, 15));
-        explainmo.setForeground(new Color(54, 69, 79));
-        damagesPnl.add(explainmo);
-
-        JTextField explanationField = new JTextField();
-        explanationField.setBounds(180, 255, 220, 23);
-        explanationField.setFont(new Font("Sans Serif", Font.PLAIN, 12));
-        explanationField.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-        damagesPnl.add(explanationField);
-
-        JButton saveBtn = new JButton("Save");
-        saveBtn.setBounds(410, 255, 80, 23);
-        saveBtn.setBackground(Color.WHITE);
-        saveBtn.setForeground(new Color(76, 175, 80));
-        saveBtn.setFont(new Font("Segoi UI", Font.BOLD, 12));
-        saveBtn.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1));
-        saveBtn.setBorderPainted(true);
-        saveBtn.setFocusPainted(false);
-        saveBtn.setOpaque(true);
-        damagesPnl.add(saveBtn);
-
-        JLabel fee = new JLabel("Late Fee:");
-        fee.setBounds(75, 400, 100, 20);
-        fee.setFont(new Font("Segoi UI", Font.PLAIN, 15));
-        fee.setForeground(new Color(54, 69, 79));
-        returnPanel4.add(fee);
-
-        JLabel fee2 = new JLabel("Damage Fee:");
-        fee2.setBounds(75, 430, 100, 20);
-        fee2.setFont(new Font("Segoi UI", Font.PLAIN, 15));
-        fee2.setForeground(new Color(54, 69, 79));
-        returnPanel4.add(fee2);
-
-        JLabel total = new JLabel("Total Fee:");
-        total.setBounds(460, 480, 100, 20);
-        total.setFont(new Font("Segoi UI", Font.PLAIN, 15));
-        total.setForeground(new Color(54, 69, 79));
-        returnPanel4.add(total);
-
-        returnPanel4.add(damagesPnl);
+        bgPanel3.setBounds(790, 295, 250, 200);
+        inventoryP.add(bgPanel3);
 
         // SA INVENTORY PANEL 3 NA LABELS 
         JPanel renewPnl = new JPanel();
@@ -904,12 +412,9 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         contentPanel.add(reportPnl, "Report");
         
         ////////////////////////////////////////////////////////////Displaying the text of book details
-        
-        Font labelFont1 = new Font("SansSerif", Font.PLAIN, 16);
-
         JLabel titleLbl = new JLabel("Title:");
         titleLbl.setBounds(10, 10, 200, 15);
-        titleLbl.setFont(labelFont1);
+        titleLbl.setFont(labelFont);
         bgPanel3.add(titleLbl);
         
         JLabel titleVal = new JLabel();
@@ -919,7 +424,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
 
         JLabel authorLbl = new JLabel("Author:");
         authorLbl.setBounds(10, 38, 200, 15);
-        authorLbl.setFont(labelFont1);
+        authorLbl.setFont(labelFont);
         bgPanel3.add(authorLbl);
         
         JLabel authorVal = new JLabel();
@@ -929,7 +434,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
 
         JLabel categoryLbl = new JLabel("Category:");
         categoryLbl.setBounds(10, 63, 200, 15);
-        categoryLbl.setFont(labelFont1);
+        categoryLbl.setFont(labelFont);
         bgPanel3.add(categoryLbl);
         
         JLabel categVal = new JLabel();
@@ -937,19 +442,19 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         categVal.setFont(labelFont);
         bgPanel3.add(categVal);
 
-        JLabel priceLbl = new JLabel("Price:");
-        priceLbl.setBounds(10, 88, 200, 15);
-        priceLbl.setFont(labelFont1);
-        bgPanel3.add(priceLbl);
+        JLabel isbnLbl = new JLabel("ISBN:");
+        isbnLbl.setBounds(10, 88, 200, 15);
+        isbnLbl.setFont(labelFont);
+        bgPanel3.add(isbnLbl);
         
-        JLabel priceVal = new JLabel();
-        priceVal.setBounds(60, 88, 200, 15);
-        priceVal.setFont(labelFont);
-        bgPanel3.add(priceVal);
+        JLabel isbnVal = new JLabel();
+        isbnVal.setBounds(60, 88, 200, 15);
+        isbnVal.setFont(labelFont);
+        bgPanel3.add(isbnVal);
 
         JLabel numberLbl = new JLabel("Number of Books:");
         numberLbl.setBounds(10, 113, 200, 15);
-        numberLbl.setFont(labelFont1);
+        numberLbl.setFont(labelFont);
         bgPanel3.add(numberLbl);
         
         JLabel numberVal = new JLabel();
@@ -959,7 +464,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
 
         JLabel borrowedLbl = new JLabel("Borrowed:");
         borrowedLbl.setBounds(10, 138, 200, 15);
-        borrowedLbl.setFont(labelFont1);
+        borrowedLbl.setFont(labelFont);
         bgPanel3.add(borrowedLbl);
         
         JLabel borrowedVal = new JLabel();
@@ -968,17 +473,14 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         bgPanel3.add(borrowedVal);
 
         JLabel remainingLbl = new JLabel("Remaining Stock:");
-        remainingLbl.setBounds(10, 163, 200, 22);
-        remainingLbl.setFont(labelFont1);
+        remainingLbl.setBounds(10, 163, 200, 17);
+        remainingLbl.setFont(labelFont);
         bgPanel3.add(remainingLbl);
         
         JLabel remainingVal = new JLabel();
         remainingVal.setBounds(135, 163, 200, 17);
         remainingVal.setFont(labelFont);
         bgPanel3.add(remainingVal);
-
-        bgPanel3.setBounds(790, 280, 250, 200);
-        inventoryP.add(bgPanel3);
         
         booktable.addMouseListener(new MouseAdapter() {
             @Override
@@ -992,8 +494,8 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
                     authorVal.setText(author);
                     String category = Inventorytable.getValueAt(selectedRow, 3).toString();
                     categVal.setText(category);
-                    String price = Inventorytable.getValueAt(selectedRow, 8).toString();
-                    priceVal.setText(price);
+                    String isbn = Inventorytable.getValueAt(selectedRow, 1).toString();
+                    isbnVal.setText(isbn);
                     int remainingBook = Integer.parseInt(Inventorytable.getValueAt(selectedRow, 6).toString());
                     remainingVal.setText(String.valueOf(remainingBook));
                     int borrowedBook = Integer.parseInt(Inventorytable.getValueAt(selectedRow, 7).toString());
@@ -1004,8 +506,6 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             }
         });
     }
-    
-    
 
     public void setButton(JButton button, int y) {
         button.setBounds(0, y, 270, 40);
@@ -1033,13 +533,32 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         });
 
         menubar.add(button);
+        
+        //Edit Profile
+        imageholder.setBounds(70, 100, 130, 130);
+        imageholder.setBorder(BorderFactory.createLineBorder(Color.WHITE, 2));
+        this.add(imageholder);
+        
+        imageholder.setIcon(new ImageIcon("C:\\Users\\Sheena Ramos\\OneDrive\\Desktop\\Profile.jpeg"));
 
-        imageholder.addMouseListener(
-                new MouseAdapter() {
+        JLabel editProfileLabel = new JLabel("Edit Profile");
+        editProfileLabel.setBounds(95, 160, 130, 20);
+        editProfileLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        editProfileLabel.setForeground(Color.WHITE);
+        editProfileLabel.setVisible(false); // Hide the label initially
+        this.add(editProfileLabel);
+
+        username.setBounds(60, 250, 200, 25);
+        username.setFont(new Font("Arial", Font.BOLD, 17));
+        username.setForeground(Color.WHITE);
+        this.add(username);
+        
+        imageholder.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e
             ) {
                 Profile();
+                editProfileLabel.setVisible(true); // Show the label when hovered
             }
         }
         );
@@ -1050,6 +569,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             public void mouseClicked(MouseEvent e
             ) {
                 Profile();
+                editProfileLabel.setVisible(false); // Hide the label when not hovered
             }
         }
         );
@@ -1058,19 +578,15 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     private void Profile() {
         CardLayout cardLayout = (CardLayout) contentPanel.getLayout();
         cardLayout.show(contentPanel, "EditProfile");
-        highlightActiveButton(null);
     }
 
     private void highlightActiveButton(JButton activeButton) {
         JButton[] buttons = {inventorybtn, returnbookbtn, renewbtn, trackbtn, reportbtn, historybtn, logoutbtn};
-
         for (JButton btn : buttons) {
             btn.setBackground(new Color(56, 142, 60));
         }
 
-        if (activeButton != null) {
-            activeButton.setBackground(new Color(255, 193, 7)); // Yellow
-        }
+        activeButton.setBackground(new Color(255, 193, 7)); // Yellow
     }
 
     public void layoutngBtn(JButton button) {
@@ -1089,6 +605,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     
     //METHODSS
     
+    @Override
     public int TotalBooks() {
         totalBooks = 0; // Reset totalBooks to zero
         for (int i = 0; i < Inventorytable.getRowCount(); i++) {
@@ -1098,6 +615,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         return totalBooks;
     }
     
+    @Override
     public int TotalBorrowedBooks() {
         totalBorrowedBooks = 0; // Initialize the total borrowed books count
         for (int i = 0; i < Inventorytable.getRowCount(); i++) {
@@ -1107,6 +625,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         return totalBorrowedBooks; // Return the total borrowed books count
     }
     
+    @Override
     public int CurrentNumBooks(){
         CurrentNumBooks = 0;
         for(int i = 0; i < Inventorytable.getRowCount(); i++){
@@ -1146,8 +665,9 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         
 
         // Update Inventorytable for the borrowed book
-        int currentQuantity = (int) Inventorytable.getValueAt(row, 6);
-        Inventorytable.setValueAt(currentQuantity - 1, row, 6);
+        currentQuantity = (int) Inventorytable.getValueAt(row, 6);
+        bookquantity = currentQuantity - 1;
+        Inventorytable.setValueAt(bookquantity, row, 6);
 
         bookborrownum++;
         borrowbookbtn.setText("Borrow book (" + bookborrownum + ")");
@@ -1246,16 +766,6 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         cancelbtn.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1));
         cancelbtn.setFocusPainted(false);
         mainPanel.add(cancelbtn);
-
-        // Remove to list button
-        JButton removelistbtn = new JButton("Remove to list");
-        removelistbtn.setBounds(50, 540, 300, 30);
-        removelistbtn.setBackground(Color.WHITE);
-        removelistbtn.setForeground(new Color(76, 175, 80));
-        removelistbtn.setFont(new Font("Segoi UI", Font.BOLD, 14));
-        removelistbtn.setBorder(BorderFactory.createLineBorder(new Color(76, 175, 80), 1));
-        removelistbtn.setFocusPainted(false);
-        mainPanel.add(removelistbtn);
         
         scannedValue.setBounds(380, 270, 250, 170);
         scannedValue.setBackground(Color.WHITE);
@@ -1321,36 +831,37 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
                     
                     // Iterate through borrow list and update the Inventorytable & booksModel
                     for (int i = 0; i < borrowListModel.getRowCount(); i++) {
-                        String isbn = borrowListModel.getValueAt(i, 1).toString();
+                        long isbn = (long) borrowListModel.getValueAt(i, 1);
                         String title = borrowListModel.getValueAt(i, 4).toString();
                         String author = borrowListModel.getValueAt(i, 5).toString();
-
+                        
                         // Update Inventorytable quantities
                         for (int row = 0; row < Inventorytable.getRowCount(); row++) {
-                            String inventoryisbn = Inventorytable.getValueAt(row, 1).toString();
-                            if (isbn.equals(inventoryisbn)) {
-                                int currentBorrowed = (int) Inventorytable.getValueAt(row, 7);
-                                Inventorytable.setValueAt(currentBorrowed + 1, row, 7);
+                            long inventoryisbn = (long) Inventorytable.getValueAt(row, 1);
+                            if (inventoryisbn == isbn){
+                                currentBorrowed = (int) Inventorytable.getValueAt(row, 7);
+                                borrowednum = currentBorrowed + 1;
+                                Inventorytable.setValueAt(borrowednum, row, 7);
                             }
                         }
                         
                         // Add book details to booksModel for the current borrower only
-                        Object[] bookDetails = {borrowerNum, callNumbers[i], isbn, title, author};
+                        Object[] bookDetails = {borrowerNum,callNumbers[i], isbn, title, author};
                         trackBooks.booksModel.addRow(bookDetails);
 
-                        // Borrowed list logic
+                        // BorrowedList LinkedList
                         BorrowedList.borrowBook(callNumbers[i], isbn, 1, borrowerNum, borrowedDate, returnDate, Borrower, title, author);
+                        BorrowedList.printBook();
                     }
 
-                    // Add transaction record to borrowedModel
-                    Object[] transactionRecord = {borrowerNum, quantity, borrowedDate, returnDate, Borrower};
-                    trackBooks.borrowedModel.addRow(transactionRecord);
+                    displayBorrower();
 
                     JOptionPane.showMessageDialog(rootPane, "Successfully Borrowed! " + borrowedDate + " " + quantity);
 
                     // Clear borrow list and reset counters
                     borrowListModel.setRowCount(0);
                     borrowedBooksList.clear();
+                    scannedValue.setText("");
                     bookborrownum = 0;
                     borrowbookbtn.setText("Borrow book (0)");
 
@@ -1362,14 +873,6 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
 
                     borrowListfrm.dispose(); // Close the borrow list frame
                 }
-            }
-        });
-
-
-            //Removing some books to the borrow list
-            removelistbtn.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
             }
         });
         cancelbtn.addActionListener(new ActionListener() {
@@ -1413,11 +916,43 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         }
     }
     
+    public void displayBorrower() {
+        trackBooks.borrowedModel.setRowCount(0);
+        BorrowedBookNode current = BorrowedList.head;
+        // Iterate through the linked list and aggregate borrowed books by borrowerNum
+        while (current != null) {
+            // Check if this borrowerNum already exists in the borrowedModel
+            boolean exists = false;
+            for (int i = 0; i < trackBooks.borrowedModel.getRowCount(); i++) {
+                String existingBorrowerNum = trackBooks.borrowedModel.getValueAt(i, 0).toString();
+                if (existingBorrowerNum.equals(current.borrowerNum)) {
+                    // Update the quantity for this borrower
+                    int currentQuantity = (int) trackBooks.borrowedModel.getValueAt(i, 1);
+                    trackBooks.borrowedModel.setValueAt(currentQuantity + current.quantityBorrowed, i, 1);
+                    exists = true;
+                    break;
+                }
+            }
+            // If the borrowerNum doesn't exist, add a new row
+            if (!exists) {
+                trackBooks.borrowedModel.addRow(new Object[]{
+                    current.borrowerNum,
+                    current.quantityBorrowed,
+                    current.borrowedDate,
+                    current.expectReturn,
+                    current.borrowerDetails
+                });
+            }
+            // Move to the next node in the linked list
+            current = current.next;
+        }
+    }
+
     public String generateNumber() {
         return String.format("Stud%04d", borrowerCount++);
     }
     
-    public static String getCurrentDate(int daysToAdd) {
+    public static String getCurrentDate(int daysToAdd) {                                        // same method
         LocalDate currentDate = LocalDate.now().plusDays(daysToAdd);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("E, MMM dd yyyy");
         return currentDate.format(formatter);
@@ -1472,10 +1007,11 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         priceField.setBounds(400, 290, 250, 30);
 
         JButton addVisual = new JButton("Upload Visual");
-        addVisual.setBounds(50, 260, 200, 40);
+        addVisual.setBounds(50, 290, 200, 25);
         addVisual.setFont(new Font("SansSerif", Font.BOLD, 14));
         addVisual.setBackground(new Color(46, 125, 50));
         addVisual.setForeground(Color.WHITE);
+        panel.add(addVisual);
 
         addButton.setBackground(new Color(46, 125, 50));
         addButton.setForeground(Color.WHITE);
@@ -1531,11 +1067,9 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
         });
 
         file = new JFileChooser();
-        //Adding the book picture
-        panel.add(addVisual);
-        addVisual.setBounds(50, 250, 200, 25);
+
         panel.add(imageborder);
-        imageborder.setBounds(50, 50, 200, 200);
+        imageborder.setBounds(50, 50, 200, 240);
         imageborder.setBorder(BorderFactory.createLineBorder(Color.BLACK, 1));
         addVisual.addActionListener(new ActionListener() {
             @Override
@@ -1571,7 +1105,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             public void actionPerformed(ActionEvent e) {
                 try{
                 imagebook = imgpath;
-                isbnbook = Integer.parseInt(isbnField.getText());
+                isbnbook = Long.parseLong(isbnField.getText());
                 bookType = booktype.getSelectedItem().toString();
                 categType = categ.getSelectedItem().toString();
                 titlebook = titleField.getText();
@@ -1699,7 +1233,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             public void actionPerformed(ActionEvent e) {
 
                 String updatedImage = imgpath;
-                int updatedIsbn = Integer.parseInt(isbnField.getText());
+                long updatedIsbn = Long.parseLong(isbnField.getText());
                 String updatedbooktype = booktype.getSelectedItem().toString();
                 String updatedcateg = categ.getSelectedItem().toString();
                 String updatedTitle = titleField.getText();
@@ -1738,7 +1272,7 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
             cardLayout.show(contentPanel, "TrackBooks");
         } else if (e.getSource() == reportbtn) {
             highlightActiveButton(reportbtn);
-            cardLayout.show(contentPanel, "Report");
+            cardLayout.show(contentPanel, "LibrarianReport");
         } else if (e.getSource() == historybtn) {
             highlightActiveButton(historybtn);
             cardLayout.show(contentPanel, "TransactionHistory");
@@ -1762,3 +1296,5 @@ public class Dashboard_Inventory extends JFrame implements ActionListener, ItemL
     public void itemStateChanged(ItemEvent e) {
     }
 }
+
+
